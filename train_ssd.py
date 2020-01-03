@@ -3,6 +3,7 @@ import os
 import logging
 import sys
 import itertools
+from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader, ConcatDataset
@@ -17,6 +18,7 @@ from vision.ssd.mobilenet_v2_ssd_lite import create_mobilenetv2_ssd_lite
 from vision.ssd.squeezenet_ssd_lite import create_squeezenet_ssd_lite
 from vision.datasets.voc_dataset import VOCDataset
 from vision.datasets.open_images import OpenImagesDataset
+from vision.datasets.egohand_dataset import EgoHandDataset
 from vision.nn.multibox_loss import MultiboxLoss
 from vision.ssd.config import vgg_ssd_config
 from vision.ssd.config import mobilenetv1_ssd_config
@@ -112,7 +114,7 @@ def train(loader, net, criterion, optimizer, device, debug_steps=100, epoch=-1):
     running_loss = 0.0
     running_regression_loss = 0.0
     running_classification_loss = 0.0
-    for i, data in enumerate(loader):
+    for i, data in enumerate(tqdm(loader)):
         images, boxes, labels = data
         images = images.to(device)
         boxes = boxes.to(device)
@@ -213,6 +215,13 @@ if __name__ == '__main__':
             store_labels(label_file, dataset.class_names)
             logging.info(dataset)
             num_classes = len(dataset.class_names)
+        elif args.dataset_type == 'ego_hand':
+            dataset = EgoHandDataset(dataset_path,
+                 transform=train_transform, target_transform=target_transform,
+                 dataset_type="train", balance_data=args.balance_data)
+            label_file = os.path.join(args.checkpoint_folder, "ego-hand-model-labels.txt")
+            store_labels(label_file, dataset.class_names)
+            num_classes = len(dataset.class_names)
 
         else:
             raise ValueError(f"Dataset type {args.dataset_type} is not supported.")
@@ -232,6 +241,10 @@ if __name__ == '__main__':
                                         transform=test_transform, target_transform=target_transform,
                                         dataset_type="test")
         logging.info(val_dataset)
+    elif args.dataset_type == 'ego_hand':
+        val_dataset = EgoHandDataset(dataset_path,
+                                        transform=test_transform, target_transform=target_transform,
+                                        dataset_type="test")
     logging.info("validation dataset size: {}".format(len(val_dataset)))
 
     val_loader = DataLoader(val_dataset, args.batch_size,
